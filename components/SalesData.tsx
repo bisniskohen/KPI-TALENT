@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { subscribeToCollection, deleteSale } from '../services/firestoreService';
+import { subscribeToCollection, deleteSale, deleteSales } from '../services/firestoreService';
 import type { Talent, Sale, SaleWithDetails, Akun } from '../types';
 import LoadingSpinner from './LoadingSpinner';
 import SalesForm from './SalesForm';
@@ -20,6 +20,8 @@ const SalesData: React.FC = () => {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saleToEdit, setSaleToEdit] = useState<SaleWithDetails | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: SortKeys; direction: SortDirection }>({ key: 'saleDate', direction: 'descending' });
@@ -169,6 +171,36 @@ const SalesData: React.FC = () => {
       }
     }
   };
+  
+  const handleSelect = (id: string) => {
+    setSelectedIds(prev => 
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          const pageIds = currentSales.map(s => s.id);
+          setSelectedIds(prev => [...new Set([...prev, ...pageIds])]);
+      } else {
+          const pageIds = currentSales.map(s => s.id);
+          setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+      }
+  };
+
+  const handleBulkDelete = async () => {
+      if (selectedIds.length === 0) return;
+      if (window.confirm(`Are you sure you want to delete ${selectedIds.length} selected sale records? This action cannot be undone.`)) {
+          try {
+              setError(null);
+              await deleteSales(selectedIds);
+              setSelectedIds([]); // Clear selection after delete
+          } catch (err) {
+              setError('Failed to delete selected sales. Please try again.');
+              console.error(err);
+          }
+      }
+  };
 
   const handleResetFilters = () => {
     setStartDate('');
@@ -247,7 +279,7 @@ const SalesData: React.FC = () => {
     <div className="p-4 mx-auto max-w-7xl sm:p-6 lg:p-8">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h2 className="text-2xl font-semibold text-text-primary">All Sales Data</h2>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
             <button onClick={() => handleOpenModal()} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-secondary hover:bg-secondary/90">
                 + Add Sale
             </button>
@@ -257,6 +289,13 @@ const SalesData: React.FC = () => {
             <button onClick={handleExportPdf} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary/90">
                 Export to PDF
             </button>
+            {selectedIds.length > 0 && (
+              <button 
+                  onClick={handleBulkDelete} 
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                  Delete Selected ({selectedIds.length})
+              </button>
+            )}
         </div>
       </div>
       {error && <div className="p-4 mb-4 text-red-700 bg-red-100 border border-red-400 rounded-md">{error}</div>}
@@ -301,6 +340,15 @@ const SalesData: React.FC = () => {
           <table className="w-full text-left table-auto">
             <thead>
               <tr className="border-b bg-background border-border-color">
+                <th className="px-4 py-3">
+                    <input 
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary"
+                        onChange={handleSelectAll}
+                        checked={currentSales.length > 0 && currentSales.every(s => selectedIds.includes(s.id))}
+                        ref={el => el && (el.indeterminate = currentSales.some(s => selectedIds.includes(s.id)) && !currentSales.every(s => selectedIds.includes(s.id)))}
+                    />
+                </th>
                 <SortableHeader tkey="saleDate" label="Date" />
                 <SortableHeader tkey="talentName" label="Nama Host" />
                 <SortableHeader tkey="akunName" label="Nama Akun" />
@@ -313,7 +361,15 @@ const SalesData: React.FC = () => {
             </thead>
             <tbody>
               {currentSales.map((sale) => (
-                <tr key={sale.id} className="border-b border-border-color hover:bg-background">
+                <tr key={sale.id} className={`border-b border-border-color hover:bg-background ${selectedIds.includes(sale.id) ? 'bg-primary/20' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input 
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary"
+                        checked={selectedIds.includes(sale.id)}
+                        onChange={() => handleSelect(sale.id)}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-sm text-text-primary">{sale.saleDate ? sale.saleDate.toDate().toLocaleDateString() : 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-text-primary">{sale.talentName}</td>
                    <td className="px-4 py-3 text-sm text-text-primary">{sale.akunName}</td>
@@ -333,7 +389,7 @@ const SalesData: React.FC = () => {
               ))}
                {sortedSales.length === 0 && (
                 <tr>
-                    <td colSpan={8} className="py-8 text-center text-text-secondary">No sales data found for the selected filters.</td>
+                    <td colSpan={9} className="py-8 text-center text-text-secondary">No sales data found for the selected filters.</td>
                 </tr>
                )}
             </tbody>

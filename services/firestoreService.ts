@@ -1,5 +1,6 @@
 
 
+
 import { db } from '../firebase';
 // Fix: Import firebase for serverTimestamp and use v8 firestore methods.
 import firebase from 'firebase/compat/app';
@@ -52,7 +53,7 @@ export const addSale = async (saleData: NewSaleData) => {
 };
 
 // Function to update an existing sale record
-export const updateSale = async (id: string, data: NewSaleData) => {
+export const updateSale = async (id: string, data: Partial<NewSaleData>) => {
   try {
     await db.collection('sales').doc(id).update(data);
   } catch (e) {
@@ -301,4 +302,104 @@ export const deleteAkun = async (id: string) => {
     console.error("Error deleting account: ", e);
     throw e;
   }
+};
+
+
+// --- Bulk Delete Functions ---
+
+// Generic batch delete helper to handle more than 500 items
+const batchDelete = async (collectionName: string, ids: string[]) => {
+  if (!ids || ids.length === 0) return;
+  // Firestore allows a maximum of 500 operations in a single batch.
+  const batchArray: Promise<void>[] = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const batch = db.batch();
+    chunk.forEach(id => {
+        const docRef = db.collection(collectionName).doc(id);
+        batch.delete(docRef);
+    });
+    batchArray.push(batch.commit());
+  }
+  await Promise.all(batchArray);
+};
+
+// Function to delete multiple sales
+export const deleteSales = async (ids: string[]) => {
+  try {
+    await batchDelete('sales', ids);
+  } catch (e) {
+    console.error("Error deleting sales: ", e);
+    throw e;
+  }
+};
+
+// Function to delete multiple talents
+export const deleteTalents = async (ids: string[]) => {
+    try {
+        await batchDelete('TALENT', ids);
+    } catch (e) {
+        console.error("Error deleting talents: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple stores
+export const deleteStores = async (ids: string[]) => {
+    try {
+        await batchDelete('NAMA TOKO', ids);
+    } catch (e) {
+        console.error("Error deleting stores: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple products
+export const deleteProducts = async (ids: string[]) => {
+    try {
+        await batchDelete('PRODUK', ids);
+    } catch (e) {
+        console.error("Error deleting products: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple product posts
+export const deleteProductPosts = async (ids: string[]) => {
+    try {
+        await batchDelete('productPosts', ids);
+    } catch (e) {
+        console.error("Error deleting product posts: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple product sales
+export const deleteProductSales = async (ids: string[]) => {
+    try {
+        await batchDelete('productSales', ids);
+    } catch (e) {
+        console.error("Error deleting product sales: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple JumlahKonten records
+export const deleteJumlahKontens = async (ids: string[]) => {
+    try {
+        await batchDelete('JUMLAH KONTEN', ids);
+    } catch (e) {
+        console.error("Error deleting jumlah konten records: ", e);
+        throw e;
+    }
+};
+
+// Function to delete multiple accounts
+export const deleteAkuns = async (ids:string[]) => {
+    try {
+        await batchDelete('NAMA AKUN', ids);
+    } catch (e) {
+        console.error("Error deleting accounts: ", e);
+        throw e;
+    }
 };

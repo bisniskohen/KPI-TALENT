@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { subscribeToCollection, deleteJumlahKonten } from '../services/firestoreService';
+import { subscribeToCollection, deleteJumlahKonten, deleteJumlahKontens } from '../services/firestoreService';
 import type { JumlahKonten, JumlahKontenWithDetails, Talent, Store } from '../types';
 import LoadingSpinner from './LoadingSpinner';
 import JumlahKontenForm from './JumlahKontenForm';
@@ -12,6 +12,7 @@ const JumlahKontenManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [recordToEdit, setRecordToEdit] = useState<JumlahKonten | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -84,6 +85,34 @@ const JumlahKontenManagement: React.FC = () => {
     }
   };
 
+  const handleSelect = (id: string) => {
+    setSelectedIds(prev => 
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          setSelectedIds(recordsWithDetails.map(p => p.id));
+      } else {
+          setSelectedIds([]);
+      }
+  };
+
+  const handleBulkDelete = async () => {
+      if (selectedIds.length === 0) return;
+      if (window.confirm(`Are you sure you want to delete ${selectedIds.length} selected records? This action cannot be undone.`)) {
+          try {
+              setError(null);
+              await deleteJumlahKontens(selectedIds);
+              setSelectedIds([]);
+          } catch (err) {
+              setError('Failed to delete selected records. Please try again.');
+              console.error(err);
+          }
+      }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -94,14 +123,21 @@ const JumlahKontenManagement: React.FC = () => {
 
   return (
     <div className="p-4 mx-auto max-w-7xl sm:p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h2 className="text-2xl font-semibold text-text-primary">Manage Content Count</h2>
-        <button
-          onClick={() => handleOpenModal()}
-          className="px-4 py-2 font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
-        >
-          + Add Record
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleOpenModal()}
+            className="px-4 py-2 font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
+          >
+            + Add Record
+          </button>
+          {selectedIds.length > 0 && (
+            <button onClick={handleBulkDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                Delete Selected ({selectedIds.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="p-4 mb-4 text-red-700 bg-red-100 border border-red-400 rounded-md">{error}</div>}
@@ -111,6 +147,15 @@ const JumlahKontenManagement: React.FC = () => {
           <table className="w-full text-left table-auto">
             <thead>
               <tr className="border-b bg-background border-border-color">
+                <th className="px-4 py-3">
+                    <input 
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary"
+                        onChange={handleSelectAll}
+                        checked={recordsWithDetails.length > 0 && selectedIds.length === recordsWithDetails.length}
+                        ref={el => el && (el.indeterminate = selectedIds.length > 0 && selectedIds.length < recordsWithDetails.length)}
+                    />
+                </th>
                 <th className="px-4 py-3 text-sm font-medium text-text-secondary">Date</th>
                 <th className="px-4 py-3 text-sm font-medium text-text-secondary">Talent</th>
                 <th className="px-4 py-3 text-sm font-medium text-text-secondary">Store</th>
@@ -120,7 +165,15 @@ const JumlahKontenManagement: React.FC = () => {
             </thead>
             <tbody>
               {recordsWithDetails.map((record) => (
-                <tr key={record.id} className="border-b border-border-color hover:bg-background">
+                <tr key={record.id} className={`border-b border-border-color hover:bg-background ${selectedIds.includes(record.id) ? 'bg-primary/20' : ''}`}>
+                  <td className="px-4 py-3">
+                      <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary"
+                          checked={selectedIds.includes(record.id)}
+                          onChange={() => handleSelect(record.id)}
+                      />
+                  </td>
                   <td className="px-4 py-3 text-sm text-text-primary">{record.tanggal ? record.tanggal.toDate().toLocaleDateString() : 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-text-primary">{record.talentName}</td>
                   <td className="px-4 py-3 text-sm text-text-primary">{record.storeName}</td>
@@ -133,7 +186,7 @@ const JumlahKontenManagement: React.FC = () => {
               ))}
                {recordsWithDetails.length === 0 && (
                 <tr>
-                    <td colSpan={5} className="py-8 text-center text-text-secondary">No records found. Add one to get started!</td>
+                    <td colSpan={6} className="py-8 text-center text-text-secondary">No records found. Add one to get started!</td>
                 </tr>
                )}
             </tbody>

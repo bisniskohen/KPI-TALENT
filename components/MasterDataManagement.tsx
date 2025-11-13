@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subscribeToCollection, deleteTalent, deleteProduct, deleteStore, deleteAkun } from '../services/firestoreService';
+import { deleteTalent, deleteProduct, deleteStore, deleteAkun, deleteTalents, deleteAkuns, deleteProducts, subscribeToCollection } from '../services/firestoreService';
 import type { Talent, Product, Store, Akun } from '../types';
 import LoadingSpinner from './LoadingSpinner';
 import TalentForm from './TalentForm';
@@ -18,6 +18,10 @@ const MasterDataManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   const [modalState, setModalState] = useState<{type: ModalType | null, data: any | null}>({ type: null, data: null });
+
+  const [selectedTalentIds, setSelectedTalentIds] = useState<string[]>([]);
+  const [selectedAkunIds, setSelectedAkunIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -89,6 +93,53 @@ const MasterDataManagement: React.FC = () => {
     }
   };
 
+  const handleBulkDelete = async (type: 'talent' | 'akun' | 'product') => {
+    let idsToDelete: string[] = [];
+    if (type === 'talent') idsToDelete = selectedTalentIds;
+    if (type === 'akun') idsToDelete = selectedAkunIds;
+    if (type === 'product') idsToDelete = selectedProductIds;
+
+    if (idsToDelete.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${idsToDelete.length} selected ${type}s? This action cannot be undone.`)) {
+      try {
+        setError(null);
+        if (type === 'talent') {
+          await deleteTalents(idsToDelete);
+          setSelectedTalentIds([]);
+        } else if (type === 'akun') {
+          await deleteAkuns(idsToDelete);
+          setSelectedAkunIds([]);
+        } else if (type === 'product') {
+          await deleteProducts(idsToDelete);
+          setSelectedProductIds([]);
+        }
+      } catch (err) {
+        setError(`Failed to delete selected ${type}s. Please try again.`);
+        console.error(err);
+      }
+    }
+  };
+
+  const handleSelect = (type: 'talent' | 'akun' | 'product', id: string) => {
+    const setters = {
+      talent: setSelectedTalentIds,
+      akun: setSelectedAkunIds,
+      product: setSelectedProductIds,
+    };
+    setters[type](prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAll = (type: 'talent' | 'akun', e: React.ChangeEvent<HTMLInputElement>) => {
+    const items = type === 'talent' ? talents : akuns;
+    const setter = type === 'talent' ? setSelectedTalentIds : setSelectedAkunIds;
+    if (e.target.checked) {
+      setter(items.map(item => item.id));
+    } else {
+      setter([]);
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -109,26 +160,41 @@ const MasterDataManagement: React.FC = () => {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Talents Card */}
         <div className="p-6 border rounded-lg bg-card border-border-color">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h3 className="text-lg font-semibold text-text-primary">Talents</h3>
-            <button
-              onClick={() => handleOpenModal('talent')}
-              className="px-4 py-2 text-sm font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
-            >
-              + Add Talent
-            </button>
+            <div className='flex flex-wrap gap-2'>
+              <button
+                onClick={() => handleOpenModal('talent')}
+                className="px-4 py-2 text-sm font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
+              >
+                + Add Talent
+              </button>
+              {selectedTalentIds.length > 0 && (
+                <button onClick={() => handleBulkDelete('talent')} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                  Delete ({selectedTalentIds.length})
+                </button>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left table-auto">
               <thead>
                 <tr className="border-b bg-background border-border-color">
+                  <th className="px-4 py-3">
+                    <input type="checkbox" onChange={(e) => handleSelectAll('talent', e)} 
+                           checked={talents.length > 0 && selectedTalentIds.length === talents.length}
+                           className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary" />
+                  </th>
                   <th className="px-4 py-3 text-sm font-medium text-text-secondary">Name</th>
                   <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {talents.map((talent) => (
-                  <tr key={talent.id} className="border-b border-border-color hover:bg-background">
+                  <tr key={talent.id} className={`border-b border-border-color hover:bg-background ${selectedTalentIds.includes(talent.id) ? 'bg-primary/20' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selectedTalentIds.includes(talent.id)} onChange={() => handleSelect('talent', talent.id)} className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary" />
+                    </td>
                     <td className="px-4 py-3 text-sm text-text-primary">{talent.nama}</td>
                     <td className="px-4 py-3 text-sm font-medium text-right">
                       <button onClick={() => handleOpenModal('talent', talent)} className="text-primary hover:text-primary/80">Edit</button>
@@ -136,7 +202,7 @@ const MasterDataManagement: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {talents.length === 0 && (<tr><td colSpan={2} className="py-8 text-center text-text-secondary">No talents found.</td></tr>)}
+                {talents.length === 0 && (<tr><td colSpan={3} className="py-8 text-center text-text-secondary">No talents found.</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -144,26 +210,41 @@ const MasterDataManagement: React.FC = () => {
 
         {/* Akun Card */}
         <div className="p-6 border rounded-lg bg-card border-border-color">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h3 className="text-lg font-semibold text-text-primary">Accounts</h3>
-            <button
-              onClick={() => handleOpenModal('akun')}
-              className="px-4 py-2 text-sm font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
-            >
-              + Add Account
-            </button>
+            <div className='flex flex-wrap gap-2'>
+              <button
+                onClick={() => handleOpenModal('akun')}
+                className="px-4 py-2 text-sm font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
+              >
+                + Add Account
+              </button>
+              {selectedAkunIds.length > 0 && (
+                <button onClick={() => handleBulkDelete('akun')} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                  Delete ({selectedAkunIds.length})
+                </button>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left table-auto">
               <thead>
                 <tr className="border-b bg-background border-border-color">
+                   <th className="px-4 py-3">
+                    <input type="checkbox" onChange={(e) => handleSelectAll('akun', e)} 
+                           checked={akuns.length > 0 && selectedAkunIds.length === akuns.length}
+                           className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary" />
+                  </th>
                   <th className="px-4 py-3 text-sm font-medium text-text-secondary">Name</th>
                   <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {akuns.map((akun) => (
-                  <tr key={akun.id} className="border-b border-border-color hover:bg-background">
+                  <tr key={akun.id} className={`border-b border-border-color hover:bg-background ${selectedAkunIds.includes(akun.id) ? 'bg-primary/20' : ''}`}>
+                     <td className="px-4 py-3">
+                      <input type="checkbox" checked={selectedAkunIds.includes(akun.id)} onChange={() => handleSelect('akun', akun.id)} className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary" />
+                    </td>
                     <td className="px-4 py-3 text-sm text-text-primary">{akun.nama}</td>
                     <td className="px-4 py-3 text-sm font-medium text-right">
                       <button onClick={() => handleOpenModal('akun', akun)} className="text-primary hover:text-primary/80">Edit</button>
@@ -171,7 +252,7 @@ const MasterDataManagement: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {akuns.length === 0 && (<tr><td colSpan={2} className="py-8 text-center text-text-secondary">No accounts found.</td></tr>)}
+                {akuns.length === 0 && (<tr><td colSpan={3} className="py-8 text-center text-text-secondary">No accounts found.</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -182,7 +263,7 @@ const MasterDataManagement: React.FC = () => {
         <div className="p-6 border rounded-lg bg-card lg:col-span-2 border-border-color">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h3 className="text-lg font-semibold text-text-primary">Stores & Products</h3>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => handleOpenModal('store')}
                 className="px-4 py-2 text-sm font-semibold text-white transition duration-150 ease-in-out rounded-lg shadow-md bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -195,6 +276,11 @@ const MasterDataManagement: React.FC = () => {
               >
                 + Add Product
               </button>
+              {selectedProductIds.length > 0 && (
+                 <button onClick={() => handleBulkDelete('product')} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                  Delete Products ({selectedProductIds.length})
+                </button>
+              )}
             </div>
           </div>
           <div className="space-y-6">
@@ -215,16 +301,20 @@ const MasterDataManagement: React.FC = () => {
                   {storeProducts.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left table-auto">
-                        <thead className="sr-only">
-                           <tr>
-                              <th>Product Name</th>
-                              <th>Link</th>
-                              <th>Actions</th>
+                        <thead>
+                           <tr className='border-b border-border-color'>
+                              <th className='w-10 px-2 py-2'></th>
+                              <th className='px-2 py-2 text-sm font-medium text-text-secondary'>Product Name</th>
+                              <th className='px-2 py-2 text-sm font-medium text-text-secondary'>Link</th>
+                              <th className='px-2 py-2 text-sm font-medium text-right text-text-secondary'>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                           {storeProducts.map((product) => (
-                            <tr key={product.id} className="border-b border-border-color last:border-b-0 hover:bg-card">
+                            <tr key={product.id} className={`border-b border-border-color last:border-b-0 hover:bg-card ${selectedProductIds.includes(product.id) ? 'bg-primary/20' : ''}`}>
+                              <td className="px-2 py-2">
+                                <input type="checkbox" checked={selectedProductIds.includes(product.id)} onChange={() => handleSelect('product', product.id)} className="w-4 h-4 rounded text-primary bg-input-bg border-border-color focus:ring-primary" />
+                              </td>
                               <td className="px-2 py-2 text-sm text-text-primary">{product.nama}</td>
                               <td className="px-2 py-2 text-sm">
                                 {product.link ? (
