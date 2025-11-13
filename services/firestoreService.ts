@@ -51,6 +51,27 @@ export const addSale = async (saleData: NewSaleData) => {
   }
 };
 
+// Function to update an existing sale record
+export const updateSale = async (id: string, data: NewSaleData) => {
+  try {
+    await db.collection('sales').doc(id).update(data);
+  } catch (e) {
+    console.error("Error updating sale: ", e);
+    throw e;
+  }
+};
+
+// Function to delete a sale record
+export const deleteSale = async (id: string) => {
+  try {
+    await db.collection('sales').doc(id).delete();
+  } catch (e) {
+    console.error("Error deleting sale: ", e);
+    throw e;
+  }
+};
+
+
 // Function to add a new talent
 export const addTalent = async (name: string) => {
   try {

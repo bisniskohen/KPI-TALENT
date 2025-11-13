@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { subscribeToCollection } from '../services/firestoreService';
+import { subscribeToCollection, deleteSale } from '../services/firestoreService';
 import type { Talent, Sale, SaleWithDetails, Akun } from '../types';
 import LoadingSpinner from './LoadingSpinner';
+import SalesForm from './SalesForm';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -16,6 +17,10 @@ const SalesData: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [saleToEdit, setSaleToEdit] = useState<SaleWithDetails | null>(null);
+
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: SortKeys; direction: SortDirection }>({ key: 'saleDate', direction: 'descending' });
   
@@ -139,6 +144,32 @@ const SalesData: React.FC = () => {
     setCurrentPage(1);
   };
 
+  const handleOpenModal = (sale: SaleWithDetails | null = null) => {
+    setSaleToEdit(sale);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setSaleToEdit(null);
+    setIsModalOpen(false);
+  };
+
+  const handleSave = () => {
+    handleCloseModal();
+  };
+
+  const handleDelete = async (saleId: string) => {
+    if (window.confirm('Are you sure you want to delete this sale record? This action cannot be undone.')) {
+      try {
+        setError(null);
+        await deleteSale(saleId);
+      } catch (err) {
+        setError('Failed to delete sale. Please try again.');
+        console.error(err);
+      }
+    }
+  };
+
   const handleResetFilters = () => {
     setStartDate('');
     setEndDate('');
@@ -217,7 +248,10 @@ const SalesData: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h2 className="text-2xl font-semibold text-text-primary">All Sales Data</h2>
         <div className="flex space-x-2">
-            <button onClick={handleExportExcel} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-secondary hover:bg-secondary/90">
+            <button onClick={() => handleOpenModal()} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-secondary hover:bg-secondary/90">
+                + Add Sale
+            </button>
+            <button onClick={handleExportExcel} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary/90">
                 Export to Excel
             </button>
             <button onClick={handleExportPdf} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary/90">
@@ -274,6 +308,7 @@ const SalesData: React.FC = () => {
                 <SortableHeader tkey="estimatedCommission" label="Est. Komisi" align="right"/>
                 <SortableHeader tkey="productViews" label="Dilihat" align="right"/>
                 <SortableHeader tkey="productClicks" label="Diklik" align="right"/>
+                <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -290,11 +325,15 @@ const SalesData: React.FC = () => {
                   </td>
                    <td className="px-4 py-3 text-sm text-right text-text-primary">{sale.productViews.toLocaleString('id-ID')}</td>
                    <td className="px-4 py-3 text-sm text-right text-text-primary">{sale.productClicks.toLocaleString('id-ID')}</td>
+                   <td className="px-4 py-3 text-sm font-medium text-right">
+                    <button onClick={() => handleOpenModal(sale)} className="text-primary hover:text-primary/80">Edit</button>
+                    <button onClick={() => handleDelete(sale.id)} className="ml-4 text-red-600 hover:text-red-800">Delete</button>
+                  </td>
                 </tr>
               ))}
                {sortedSales.length === 0 && (
                 <tr>
-                    <td colSpan={7} className="py-8 text-center text-text-secondary">No sales data found for the selected filters.</td>
+                    <td colSpan={8} className="py-8 text-center text-text-secondary">No sales data found for the selected filters.</td>
                 </tr>
                )}
             </tbody>
@@ -316,6 +355,16 @@ const SalesData: React.FC = () => {
             </div>
         )}
       </div>
+
+      {isModalOpen && (
+        <SalesForm
+            saleToEdit={saleToEdit}
+            talents={talents}
+            akuns={akuns}
+            onClose={handleCloseModal}
+            onSave={handleSave}
+        />
+      )}
     </div>
   );
 };

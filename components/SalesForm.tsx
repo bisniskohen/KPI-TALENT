@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { addSale } from '../services/firestoreService';
-import type { Talent, Store, Akun } from '../types';
+import React, { useState, useEffect } from 'react';
+import { addSale, updateSale } from '../services/firestoreService';
+import type { Talent, Akun, Sale } from '../types';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
 
@@ -8,10 +8,11 @@ interface SalesFormProps {
   talents: Talent[];
   akuns: Akun[];
   onClose: () => void;
-  onSaleAdded: () => void;
+  onSave: () => void;
+  saleToEdit?: Sale | null;
 }
 
-const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAdded }) => {
+const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSave, saleToEdit }) => {
   const [talentId, setTalentId] = useState('');
   const [akunId, setAkunId] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
@@ -21,6 +22,18 @@ const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAd
   const [productClicks, setProductClicks] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (saleToEdit) {
+      setTalentId(saleToEdit.talentId);
+      setAkunId(saleToEdit.akunId);
+      setSaleDate(saleToEdit.saleDate.toDate().toISOString().split('T')[0]);
+      setTotalValue(saleToEdit.totalValue);
+      setEstimatedCommission(saleToEdit.estimatedCommission);
+      setProductViews(saleToEdit.productViews);
+      setProductClicks(saleToEdit.productClicks);
+    }
+  }, [saleToEdit]);
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<number>>) => {
     const value = e.target.value.replace(/\./g, ''); // Remove dots for parsing
@@ -39,7 +52,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAd
     setIsSubmitting(true);
     
     try {
-      await addSale({
+      const saleData = {
         talentId,
         akunId,
         saleDate: firebase.firestore.Timestamp.fromDate(new Date(`${saleDate}T00:00:00`)),
@@ -47,10 +60,16 @@ const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAd
         estimatedCommission,
         productViews,
         productClicks,
-      });
-      onSaleAdded();
+      };
+
+      if (saleToEdit) {
+        await updateSale(saleToEdit.id, saleData);
+      } else {
+        await addSale(saleData);
+      }
+      onSave();
     } catch (err) {
-      setError('Failed to add sale. Please try again.');
+      setError('Failed to save sale. Please try again.');
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -61,7 +80,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAd
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
       <div className="w-full max-w-lg p-6 mx-4 border rounded-lg shadow-xl bg-card border-border-color overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between pb-4 border-b border-border-color">
-          <h2 className="text-xl font-bold text-text-primary">Add New Sale</h2>
+          <h2 className="text-xl font-bold text-text-primary">{saleToEdit ? 'Edit Sale' : 'Add New Sale'}</h2>
           <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -108,7 +127,7 @@ const SalesForm: React.FC<SalesFormProps> = ({ talents, akuns, onClose, onSaleAd
           <div className="flex justify-end pt-4 space-x-4">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium border rounded-md text-text-primary bg-border-color border-border-color hover:bg-gray-600">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary/90 disabled:bg-primary/50 disabled:cursor-not-allowed">
-              {isSubmitting ? 'Submitting...' : 'Add Sale'}
+              {isSubmitting ? 'Saving...' : (saleToEdit ? 'Save Changes' : 'Add Sale')}
             </button>
           </div>
         </form>
