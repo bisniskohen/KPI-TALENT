@@ -1,0 +1,5 @@
+{
+  "name": "Talent KPI Dashboard",
+  "description": "A comprehensive dashboard to track talent performance and sales data using Firebase for data storage and authentication. Visualize key performance indicators with charts and manage sales records efficiently.",
+  "requestFramePermissions": []
+}
