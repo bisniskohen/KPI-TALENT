@@ -45,12 +45,12 @@ const App: React.FC = () => {
             onNavigate={setView}
           />
           <main>
-            {view === 'dashboard' && <Dashboard />}
-            {view === 'masterdata' && <MasterDataManagement />}
-            {view === 'products' && <ProductPosts />}
-            {view === 'jumlahkonten' && <JumlahKontenManagement />}
-            {view === 'sales' && <SalesData />}
-            {view === 'productsales' && <ProductSalesManagement />}
+            <div className={view === 'dashboard' ? '' : 'hidden'}><Dashboard /></div>
+            <div className={view === 'masterdata' ? '' : 'hidden'}><MasterDataManagement /></div>
+            <div className={view === 'products' ? '' : 'hidden'}><ProductPosts /></div>
+            <div className={view === 'jumlahkonten' ? '' : 'hidden'}><JumlahKontenManagement /></div>
+            <div className={view === 'sales' ? '' : 'hidden'}><SalesData /></div>
+            <div className={view === 'productsales' ? '' : 'hidden'}><ProductSalesManagement /></div>
           </main>
         </>
       ) : (

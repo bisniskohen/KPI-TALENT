@@ -105,7 +105,6 @@ const Dashboard: React.FC = () => {
     });
 
     const talentMap = new Map(talents.map(t => [t.id, t.nama]));
-    const productMap = new Map(products.map(p => [p.id, p.nama]));
     const akunMap = new Map(akuns.map(a => [a.id, a.nama]));
 
     const totalRevenue = filteredSales.reduce((acc, sale) => acc + sale.totalValue, 0);
@@ -114,8 +113,6 @@ const Dashboard: React.FC = () => {
     const totalClicks = filteredSales.reduce((acc, sale) => acc + sale.productClicks, 0);
 
     const totalSalesCount = filteredSales.length;
-    const totalStores = stores.length;
-    const totalProducts = products.length;
     const totalPosts = filteredPosts.length;
     
     const salesByTalent = new Map<string, number>();
@@ -152,28 +149,35 @@ const Dashboard: React.FC = () => {
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
       
-    const productPerformanceMap = new Map<string, { name: string; postCount: number; soldCount: number }>();
-    products.forEach(p => {
-        productPerformanceMap.set(p.id, { name: p.nama, postCount: 0, soldCount: 0 });
-    });
+    const accountAnalysisMap = new Map<string, {
+      promotedStores: Set<string>;
+      promotedProducts: Set<string>;
+      totalPosts: number;
+    }>();
 
     filteredPosts.forEach(post => {
-        const current = productPerformanceMap.get(post.productId);
-        if (current) {
-            current.postCount += 1;
+        if (!accountAnalysisMap.has(post.akunId)) {
+            accountAnalysisMap.set(post.akunId, {
+                promotedStores: new Set(),
+                promotedProducts: new Set(),
+                totalPosts: 0,
+            });
         }
+        const current = accountAnalysisMap.get(post.akunId)!;
+        current.promotedStores.add(post.storeId);
+        current.promotedProducts.add(post.productId);
+        current.totalPosts += 1;
     });
 
-    filteredProductSales.forEach(sale => {
-        const current = productPerformanceMap.get(sale.productId);
-        if (current) {
-            current.soldCount += sale.quantity;
-        }
-    });
-
-    const productPerformance = [...productPerformanceMap.values()]
-        .filter(p => p.postCount > 0 || p.soldCount > 0)
-        .sort((a, b) => b.soldCount - a.soldCount);
+    const accountAnalysis = [...accountAnalysisMap.entries()]
+        .map(([akunId, data]) => ({
+            id: akunId,
+            name: akunMap.get(akunId) || 'Unknown Account',
+            promotedStoresCount: data.promotedStores.size,
+            promotedProductsCount: data.promotedProducts.size,
+            totalPosts: data.totalPosts,
+        }))
+        .sort((a, b) => b.totalPosts - a.totalPosts);
 
     const allSalesMetrics = [
         { name: 'Total GMV', value: totalRevenue, type: 'currency' },
@@ -189,13 +193,11 @@ const Dashboard: React.FC = () => {
     return {
       totalRevenue,
       totalSalesCount,
-      totalStores,
-      totalProducts,
       totalPosts,
       topTalent,
       topPerformingTalents,
       salesByAccount,
-      productPerformance,
+      accountAnalysis,
       salesMetrics,
       allSalesMetrics,
     };
@@ -257,7 +259,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 lg:grid-cols-4">
         <div className="p-6 border rounded-lg bg-card border-border-color">
           <h3 className="text-lg font-medium text-text-secondary">Total Revenue</h3>
           <p className="mt-2 text-3xl font-bold text-text-primary">
@@ -273,14 +275,6 @@ const Dashboard: React.FC = () => {
           <p className="mt-2 text-3xl font-bold truncate text-text-primary">
             {dashboardData.topTalent.name}
           </p>
-        </div>
-        <div className="p-6 border rounded-lg bg-card border-border-color">
-          <h3 className="text-lg font-medium text-text-secondary">Total Stores</h3>
-          <p className="mt-2 text-3xl font-bold text-text-primary">{dashboardData.totalStores}</p>
-        </div>
-        <div className="p-6 border rounded-lg bg-card border-border-color">
-          <h3 className="text-lg font-medium text-text-secondary">Total Products</h3>
-          <p className="mt-2 text-3xl font-bold text-text-primary">{dashboardData.totalProducts}</p>
         </div>
         <div className="p-6 border rounded-lg bg-card border-border-color">
           <h3 className="text-lg font-medium text-text-secondary">Total Content Posts</h3>
@@ -358,12 +352,44 @@ const Dashboard: React.FC = () => {
             <SalesMetricsChart data={dashboardData.salesMetrics} />
         </div>
 
+      {/* New Detailed Analysis Section */}
+      <div className="p-6 mt-8 border rounded-lg bg-card border-border-color">
+        <h3 className="mb-4 text-lg font-semibold text-text-primary">Analisa Detail per Akun</h3>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left table-auto">
+                <thead>
+                    <tr className="border-b bg-background border-border-color">
+                        <th className="px-4 py-3 text-sm font-medium text-text-secondary">Nama Akun</th>
+                        <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Total Toko Dipromosikan</th>
+                        <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Total Produk Dipromosikan</th>
+                        <th className="px-4 py-3 text-sm font-medium text-right text-text-secondary">Jumlah Postingan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {dashboardData.accountAnalysis.map((akun) => (
+                        <tr key={akun.id} className="border-b border-border-color hover:bg-background">
+                            <td className="px-4 py-3 text-sm text-text-primary">{akun.name}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-right text-text-primary">{akun.promotedStoresCount}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-right text-text-primary">{akun.promotedProductsCount}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-right text-text-primary">{akun.totalPosts}</td>
+                        </tr>
+                    ))}
+                    {dashboardData.accountAnalysis.length === 0 && (
+                        <tr>
+                            <td colSpan={4} className="py-8 text-center text-text-secondary">No account data available for the selected period.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
       {isModalOpen && (
         <SalesForm
           talents={talents}
           akuns={akuns}
           onClose={() => setIsModalOpen(false)}
-          onSaleAdded={handleSaleAdded}
+          onSave={handleSaleAdded}
         />
       )}
     </div>
